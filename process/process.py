@@ -1,4 +1,4 @@
-from ctypes import byref, c_byte, c_char, c_int32, c_size_t, c_uint32, sizeof
+from ctypes import byref, c_byte, c_char, c_double, c_float, c_int32, c_size_t, c_uint32, sizeof
 from process.process_utils import get_process_info_by_name, create_buffer
 from process.process_constants import KERNEL32, PROCESS_ALL_ACCESS
 import traceback as tb
@@ -27,6 +27,16 @@ class Process:
     def read_int32(self, address):
         value_packed = self.read_memory(address, sizeof(c_int32))
         (value,) = struct.unpack("@i", value_packed)
+        return value
+
+    def read_float(self, address):
+        value_packed = self.read_memory(address, sizeof(c_float))
+        (value,) = struct.unpack("@f", value_packed)
+        return value
+
+    def read_double(self, address):
+        value_packed = self.read_memory(address, sizeof(c_double))
+        (value,) = struct.unpack("@d", value_packed)
         return value
 
     def read_zstring(self, address):
