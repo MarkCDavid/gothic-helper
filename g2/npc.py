@@ -1,4 +1,4 @@
-from g2.memory.Objects import Object
+from g2.memory.objects import Object
 from handlers.base_handlers import default_handler, int32_handler, mat4_handler, string_handler, uint32_handler
 
 class Npc(Object):

@@ -1,7 +1,7 @@
 from queue import Queue
 from collections import Set
 from process.process import Process
-from g2.memory.Objects import Object, ObjectField
+from g2.memory.objects import Object, ObjectField
 
 class Resolver:
     
