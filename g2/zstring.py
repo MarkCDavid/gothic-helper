@@ -9,7 +9,7 @@ class zString(Object):
 
         self.unknown1 = ObjectField(self, 0x0000)
         self.unknown2 = ObjectField(self, 0x0004)
-        self.string = StringPointerField(self, 0x0008)
+        self.stringPointer = StringPointerField(self, 0x0008)
         self.length = Int32Field(self, 0x000C, 1)
         self.allocated = Int32Field(self, 0x0010)
 
@@ -17,9 +17,9 @@ class zStringField(InlineObjectField):
     def __init__(self, parent, offset):
         super().__init__(parent, offset)
 
-    def load_blob(self, object):
+    def load_blob(self,):
         blob_slice = slice(self.offset, self.offset + SIZE_ZSTRING)
-        object.blob = self.parent.blob[blob_slice]
+        self.object.blob = self.parent.blob[blob_slice]
     
     def create_object(self):
         return zString(self.parent.process, self.parent.address)

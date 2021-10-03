@@ -64,18 +64,18 @@ class InlineObjectField(ObjectField):
         if address in pointerMap:
             return
 
-        object = self.create_object() 
-        self.load_blob(object)
-        self.pointerMap[address] = object
+        self.object = self.create_object() 
+        self.load_blob()
+        self.pointerMap[address] = self.object
 
-        for field in object.get_fields():
+        for field in self.object.get_fields():
             fieldsToResolve.put(field)
 
-    def load_blob(self, object):
+    def load_blob(self):
         pass
 
     def get_value(self):
-        return self
+        return self.object
 
     def create_object(self):
         raise NotImplementedError()

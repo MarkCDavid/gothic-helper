@@ -10,7 +10,6 @@ class StringPointer(Object):
 class StringPointerField(PointerField):
     def __init__(self, parent, offset):
         super().__init__(parent, offset)
-        self.type = type
 
     def create_object(self):
         return StringPointer(self.parent.process, self.address, self.parent.length)

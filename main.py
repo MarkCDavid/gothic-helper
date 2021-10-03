@@ -1,5 +1,4 @@
-from collections import deque
-from g2 import item
+from g2.memory.objectsUtils import zstring_value
 from g2.memory.resolver import Resolver
 from g2.world import World
 from process.process import Process
@@ -10,5 +9,5 @@ with Process("Gothic2.exe") as g2:
     resolver = Resolver(g2, world)
     resolver.resolve()
 
-    print(world.worldName)
+    print(zstring_value(world.worldName))
    
