@@ -1,7 +1,7 @@
-from g2.G2MemoryObject import G2MemoryObject
+from g2.memory.Objects import Object
 from handlers.base_handlers import default_handler, int32_handler, mat4_handler, string_handler, uint32_handler
 
-class Npc(G2MemoryObject):
+class Npc(Object):
     def __init__(self, process, address):
         super().__init__(process, address)
         self.fields = {
