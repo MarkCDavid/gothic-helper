@@ -1,27 +1,21 @@
-from g2.memory.objects import Object
-from handlers.base_handlers import default_handler, int32_handler, mat4_handler, string_handler, uint32_handler
+from g2.base import Int32Field
+from g2.mat4 import Mat4, Mat4Field
+from g2.memory.objects import Object, PointerField
+from g2.memory.objectSize import SIZE_NPC
+from g2.zstring import zStringField
+
 
 class Npc(Object):
-    def __init__(self, process, address):
-        super().__init__(process, address)
-        self.fields = {
-            "name": (0x012C, string_handler),
-            "visual": (0x0214, string_handler),
-            "visualChange": (0x0228, string_handler),
-            "effect": (0x023C, string_handler),
-            "schemeName": (0x0254, string_handler),
-            "description": (0x027C, string_handler),
-            "transform": (0x003C, mat4_handler),
-            "text1": (0x0290, string_handler),
-            "text2": (0x02A4, string_handler),
-            "text3": (0x02B8, string_handler),
-            "text4": (0x02CC, string_handler),
-            "text5": (0x02E0, string_handler),
-            "text6": (0x02F4, string_handler),
-            "count1": (0x0300, int32_handler),
-            "count2": (0x0304, int32_handler),
-            "count3": (0x0308, int32_handler),
-            "count4": (0x030C, int32_handler),
-            "count5": (0x0310, int32_handler),
-            "count6": (0x0314, int32_handler),
-        }
+    def __init__(self, process, address, size=SIZE_NPC):
+        super().__init__(process, address, size)
+        
+        self.transform: Mat4 = Mat4Field(self, 0x003C)
+        self.homeWorld: int = Int32Field(self, 0x00B8)
+
+        self.objectName = zStringField(self, 0x0010)
+        self.name = zStringField(self, 0x0124)
+
+
+class NpcField(PointerField):
+    def create_object(self):
+        return Npc(self.parent.process, self.address)
