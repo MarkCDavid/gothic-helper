@@ -10,7 +10,7 @@ class Resolver:
         self.root = root
         self.pointerMap = {}
 
-    def resolve(self):
+    def resolve_root(self):
         self.pointerMap.clear()
         self.pointerMap[self.root.address] = self.root
 
@@ -20,7 +20,18 @@ class Resolver:
         for fieldToResolve in self.root.get_fields():
             fieldsToResolve.put(fieldToResolve)
 
-            while not fieldsToResolve.empty():
-                fieldToResolve = fieldsToResolve.get()
-                fieldToResolve.resolve(fieldsToResolve, self.pointerMap)
+        while not fieldsToResolve.empty():
+            fieldToResolve = fieldsToResolve.get()
+            fieldToResolve.resolve(fieldsToResolve, self.pointerMap)
+    
+    def resolve(self, root: "Object"):
+        root.load_memory()
+        
+        fieldsToResolve: "Queue[ObjectField]" = Queue()
+        for fieldToResolve in root.get_fields():
+            fieldsToResolve.put(fieldToResolve)
+
+        while not fieldsToResolve.empty():
+            fieldToResolve = fieldsToResolve.get()
+            fieldToResolve.resolve(fieldsToResolve, self.pointerMap, True)
         

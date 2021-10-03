@@ -2,6 +2,7 @@ from ctypes import windll
 
 KERNEL32 = windll.kernel32
 PSAPI = windll.psapi
+USER32 = windll.user32
 
 STANDARD_RIGHTS_REQUIRED = 0x000F0000
 SYNCHRONIZE = 0x00100000

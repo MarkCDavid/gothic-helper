@@ -5,11 +5,11 @@ from g2.memory.objects import Object, ObjectField, PointerField
 class StringPointer(Object):
     def __init__(self, process, address, size=SIZE_POINTER):
         super().__init__(process, address, size)
-        self.string = StringField(self, 0x0000, size)
+        self.string = StringField(self, 0x0000, "string", size)
 
 class StringPointerField(PointerField):
-    def __init__(self, parent, offset):
-        super().__init__(parent, offset)
+    def __init__(self, parent, offset, name):
+        super().__init__(parent, offset, name)
 
     def create_object(self):
         return StringPointer(self.parent.process, self.address, self.parent.length)

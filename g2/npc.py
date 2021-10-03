@@ -9,11 +9,11 @@ class Npc(Object):
     def __init__(self, process, address, size=SIZE_NPC):
         super().__init__(process, address, size)
         
-        self.transform: Mat4 = Mat4Field(self, 0x003C)
-        self.homeWorld: int = Int32Field(self, 0x00B8)
+        self.transform: Mat4 = Mat4Field(self, 0x003C, "transform")
+        self.homeWorld: int = Int32Field(self, 0x00B8, "homeWorld")
 
-        self.objectName = zStringField(self, 0x0010)
-        self.name = zStringField(self, 0x0124)
+        self.objectName = zStringField(self, 0x0010, "objectName")
+        self.name = zStringField(self, 0x0124, "name")
 
 
 class NpcField(PointerField):

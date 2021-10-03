@@ -45,26 +45,30 @@ class Object:
 
 
 class ObjectField:
-    def __init__(self, parent, offset, priority=0):
+    def __init__(self, parent, offset, name, priority=0):
         self.parent: "Object" = parent
         self.offset: int = offset
         self.priority: int = priority
+        self.name: str = name
 
-    def resolve(self, fieldsToResolve, pointerMap):
+    def resolve(self, fieldsToResolve, pointerMap, forceUpdatePointerMap = False):
         self.pointerMap = pointerMap
 
     def get_value(self):
         return None
 
+    def __str__(self) -> str:
+        return f"<{type(self).__name__}> {self.name}"
+
 class InlineObjectField(ObjectField):
-    def resolve(self, fieldsToResolve, pointerMap):
-        super().resolve(fieldsToResolve, pointerMap)
+    def resolve(self, fieldsToResolve, pointerMap, forceUpdatePointerMap = False):
+        super().resolve(fieldsToResolve, pointerMap, forceUpdatePointerMap)
        
         address = self.parent.address + self.offset
-        if address in pointerMap:
+        if not forceUpdatePointerMap and address in pointerMap:
             return
 
-        self.object = self.create_object() 
+        self.object = self.pointerMap[address] if address in self.pointerMap else self.create_object() 
         self.load_blob()
         self.pointerMap[address] = self.object
 
@@ -94,8 +98,8 @@ class PointerField(ObjectField):
     def get_address(self):
         return self.address
 
-    def resolve(self, fieldsToResolve, pointerMap):
-        super().resolve(fieldsToResolve, pointerMap)
+    def resolve(self, fieldsToResolve, pointerMap, forceUpdatePointerMap = False):
+        super().resolve(fieldsToResolve, pointerMap, forceUpdatePointerMap)
         
         fieldSlice = slice(self.offset, self.offset + sizeof(c_int32))
         (self.address, ) = struct.unpack("@i", self.parent.blob[fieldSlice])
@@ -103,10 +107,10 @@ class PointerField(ObjectField):
         if self.address == 0:
             return
 
-        if self.address in pointerMap:
+        if not forceUpdatePointerMap and self.address in pointerMap:
             return
 
-        object = self.create_object() 
+        object = self.pointerMap[self.address] if self.address in self.pointerMap else self.create_object()
         object.load_memory()
         self.pointerMap[self.address] = object
 
