@@ -40,23 +40,6 @@ def get_items(hero: Npc, world: World) -> "Npc":
     
     return list(sorted(items, key=lambda i: i[0]))
 
-def world_to_screen_space(item_position, view_matrix, projection_matrix, width, height):
-    view_matrix = np.mat(view_matrix.as_list())
-    projection_matrix = np.mat(projection_matrix.as_list())
-
-    view_projection_matrix = np.matmul(projection_matrix, view_matrix)
-
-
-    item_position = np.array(item_position)
-    item_position = np.dot(view_projection_matrix, item_position)
-
-    print(item_position)
-    
-    x = (( item_position[0, 0] + 1 ) / 2.0) * width
-    y = (( 10 - item_position[0,2] ) / 2.0) * height
-    return (int(x), int(y))
-
-
 def world_to_screen_space2(world_matrix, view_matrix, projection_matrix, width, height):
     p = np.array([0, 0, 0, 1])
     world_matrix = np.mat(world_matrix.as_list())
@@ -66,13 +49,14 @@ def world_to_screen_space2(world_matrix, view_matrix, projection_matrix, width, 
     p = np.squeeze(np.asarray(np.dot(world_matrix, p)))
     p = np.squeeze(np.asarray(np.dot(view_matrix, p)))
     p = np.squeeze(np.asarray(np.dot(projection_matrix, p)))
-    x, y = p[0], p[1]
-
+    x, y, z, w = p[0], p[1], p[2], p[3]
+    xp, yp = x / z, y / z
+    
     # p2 = np.matmul(projection_matrix, np.matmul(view_matrix, world_matrix))
     # print(p2)
     
-    x = x + width / 2
-    y = y + height
+    x = ((xp + 1) / 2) * width
+    y = ((1 - yp) / 2) * height
     return (int(x), int(y))
 
 def find_window(parent, names):
@@ -99,13 +83,14 @@ class MainWindow(QMainWindow):
         self.setGeometry(x, y, w, h)
         self.x = 0
         self.y = 0
+        self.name = "<>"
         self.processThread = G2ProcessThread(g2)
         self.processThread.processing_finished.connect(self.draw)
         self.processThread.start()
 
     def draw(self, data):
-        x, y = data.split(' ')
-        self.x, self.y = float(x), float(y)
+        x, y, name = data.split('|')
+        self.x, self.y, self.name = float(x), float(y), str(name)
         self.update()
       
 
@@ -113,6 +98,7 @@ class MainWindow(QMainWindow):
         painter = QPainter(self)
         painter.setPen(QPen(Qt.green, 2, Qt.DashLine))
         painter.drawEllipse(int(self.x), int(self.y), 4, 4)
+        painter.drawText(int(self.x) - 50,  int(self.y) - 20, 100, 20, 0, f"<{self.name}>")
 
     def mousePressEvent(self, event):
         QtWidgets.qApp.quit()
@@ -154,12 +140,13 @@ class G2ProcessThread(QtCore.QThread):
 
     #     resolver.resolve(hero)
     #     time.sleep(1)
-            ss = world_to_screen_space2(closest_items[0][1].transform, camera.viewMatrix, camera.projectionMatrix, 800, 600)
-            print(ss)
+            closest_item = closest_items[0][1]
+            ss = world_to_screen_space2(closest_item.transform, camera.viewMatrix, camera.projectionMatrix, 800, 600)
+            x, y = ss
             resolver.resolve(hero)
             resolver.resolve(camera)
-            self.processing_finished.emit("%i %i" % ss)
-            time.sleep(0.25)
+            self.processing_finished.emit("%i|%i|%s" % (x, y, zstring_value(closest_item.description)))
+            time.sleep(0.01)
 
 
 with Process("Gothic2.exe") as g2:
@@ -183,7 +170,6 @@ with Process("Gothic2.exe") as g2:
             break
     
     x, y, w, h = window[2]
-
     app = QApplication(sys.argv)
     mywindow = MainWindow(g2, x, y, w, h)
     mywindow.show()

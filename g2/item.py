@@ -1,4 +1,4 @@
-from g2.base import Int32Field
+from g2.base import FloatField, Int32Field
 from g2.mat4 import Mat4Field
 from g2.memory.objects import Object, ObjectField, PointerField
 from g2.memory.objectSize import SIZE_ITEM
@@ -19,6 +19,11 @@ class Item(Object):
         self.effect = zStringField(self, 0x0234, "effect")
         self.schemeName = zStringField(self, 0x024C, "schemeName")
         self.description = zStringField(self, 0x0274, "description")
+
+        
+        self.bboxmaxx = FloatField(self, 0x0300, "bboxmaxx")
+        self.bboxmaxy = FloatField(self, 0x0300, "bboxmaxy")
+        self.bboxmaxz = FloatField(self, 0x0300, "bboxmaxz")
         
         self.text1 = zStringField(self, 0x0288, "text1")
         self.text2 = zStringField(self, 0x029C, "text2")
