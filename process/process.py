@@ -1,61 +1,55 @@
-from ctypes import byref, c_byte, c_char, c_double, c_float, c_int32, c_size_t, c_uint32, sizeof
-from process.process_utils import get_process_info_by_name, create_buffer
+from ctypes import byref, c_size_t
+from process.buffer import Buffer
+from process.process_info import ProcessInfoFetcher
 from process.process_constants import KERNEL32, PROCESS_ALL_ACCESS
 import traceback as tb
 import struct
 
+from process.sizes import SIZE_BYTE, SIZE_DOUBLE, SIZE_FLOAT, SIZE_INT32, SIZE_UINT32
+
 class Process:
     def __init__(self, processName) -> None:
-        self.processName = processName
-        (self.pid, self.baseAddress, _) = get_process_info_by_name(processName)    
-        if self.pid is None:
+        self.buffer = Buffer(Buffer.MB)
+        self.processInfo = ProcessInfoFetcher().by_name(processName)  
+        if self.processInfo.pid is None:
             raise Exception(f"Could not find the process with the name {processName} running. Are you sure it is running?")
         self._handle = None
 
     def read_memory(self, address, size):
-        buffer, bufferSize = create_buffer(c_byte, size)
-        bytesRead = c_size_t()
-        
-        success = KERNEL32.ReadProcessMemory(self._handle, address, buffer, bufferSize, byref(bytesRead))
-        return bytes(buffer) if success else bytes()
+        bufferPointer, bufferSize = self.buffer.allocate(SIZE_BYTE * size)
+        success = KERNEL32.ReadProcessMemory(self._handle, address, bufferPointer, bufferSize, byref(c_size_t()))
+        if not success:
+            print(KERNEL32.GetLastError())
+        return self.buffer.read(0, size) if success else bytes()
 
     def read_uint32(self, address):
-        value_packed = self.read_memory(address, sizeof(c_uint32))
-        (value,) = struct.unpack("@I", value_packed)
-        return value
+        return self._read(address, "@I", SIZE_UINT32)
     
     def read_int32(self, address):
-        value_packed = self.read_memory(address, sizeof(c_int32))
-        (value,) = struct.unpack("@i", value_packed)
-        return value
+        return self._read(address, "@i", SIZE_INT32)
 
     def read_float(self, address):
-        value_packed = self.read_memory(address, sizeof(c_float))
-        (value,) = struct.unpack("@f", value_packed)
-        return value
+        return self._read(address, "@f", SIZE_FLOAT)
 
     def read_double(self, address):
-        value_packed = self.read_memory(address, sizeof(c_double))
-        (value,) = struct.unpack("@d", value_packed)
+        return self._read(address, "@d", SIZE_DOUBLE)
+
+    def _read(self, address, format, size):
+        value_packed = self.read_memory(address, size)
+        (value,) = struct.unpack(format, value_packed)
         return value
 
-    def read_zstring(self, address):
-        string_pointer = self.read_uint32(address)
-        string_size = self.read_int32(address + sizeof(c_uint32))
-        string_data = self.read_memory(string_pointer, sizeof(c_char) * string_size)
-        return string_data.decode("ascii")
-
     def follow_pointer_path(self, pointer_path):
-        address = self.baseAddress
+        address = self.processInfo.baseAddress
         for offset in pointer_path:
             address += offset
             address = self.read_uint32(address)
         return address
     
     def __enter__(self):
-        self._handle = KERNEL32.OpenProcess(PROCESS_ALL_ACCESS, False, self.pid)
+        self._handle = KERNEL32.OpenProcess(PROCESS_ALL_ACCESS, False, self.processInfo.pid)
         if self._handle == 0:
-            raise Exception(f"Could not open a handle to the process with the name {self.processName}.")
+            raise Exception(f"Could not open a handle to the process with the name {self.processInfo.processName}.")
         return self
 
     def __exit__(self, type, value, traceback):
