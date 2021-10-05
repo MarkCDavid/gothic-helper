@@ -1,5 +1,5 @@
-from queue import Queue
-from collections import Set
+from typing import Deque
+from collections import deque
 from process.process import Process
 from g2.memory.objects import Object, ObjectField
 
@@ -16,22 +16,22 @@ class Resolver:
 
         self.root.load_memory()
         
-        fieldsToResolve: "Queue[ObjectField]" = Queue()
+        fieldsToResolve: "Deque[ObjectField]" = deque()
         for fieldToResolve in self.root.get_fields():
-            fieldsToResolve.put(fieldToResolve)
+            fieldsToResolve.append(fieldToResolve)
 
-        while not fieldsToResolve.empty():
-            fieldToResolve = fieldsToResolve.get()
+        while fieldsToResolve:
+            fieldToResolve = fieldsToResolve.popleft()
             fieldToResolve.resolve(fieldsToResolve, self.pointerMap)
     
     def resolve(self, root: "Object"):
         root.load_memory()
         
-        fieldsToResolve: "Queue[ObjectField]" = Queue()
+        fieldsToResolve: "Deque[ObjectField]" = deque()
         for fieldToResolve in root.get_fields():
-            fieldsToResolve.put(fieldToResolve)
+            fieldsToResolve.append(fieldToResolve)
 
-        while not fieldsToResolve.empty():
-            fieldToResolve = fieldsToResolve.get()
+        while fieldsToResolve:
+            fieldToResolve = fieldsToResolve.popleft()
             fieldToResolve.resolve(fieldsToResolve, self.pointerMap, True)
         

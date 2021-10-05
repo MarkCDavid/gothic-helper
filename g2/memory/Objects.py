@@ -73,7 +73,7 @@ class InlineObjectField(ObjectField):
         self.pointerMap[address] = self.object
 
         for field in self.object.get_fields():
-            fieldsToResolve.put(field)
+            fieldsToResolve.append(field)
 
     def load_blob(self):
         pass
@@ -115,7 +115,7 @@ class PointerField(ObjectField):
         self.pointerMap[self.address] = object
 
         for field in object.get_fields():
-            fieldsToResolve.put(field)
+            fieldsToResolve.append(field)
     
     def create_object(self):
         raise NotImplementedError()

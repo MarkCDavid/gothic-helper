@@ -4,7 +4,7 @@ from g2.memory.objectsUtils import sortList_iterator, zstring_value
 from g2.memory.resolver import Resolver
 from g2.npc import Npc
 from g2.world import World
-from pointer_paths import ITEM_LIST_PATH
+from pointer_paths import ITEM_LIST_PATH, WORLD_PATH
 from process.process import Process
 import numpy as np
 import time
@@ -185,24 +185,27 @@ with Process("Gothic2.exe") as g2:
     # mywindow.show()
     # app.exec()
 
-    item_pointers = []
-    item_list_address = g2.follow_pointer_path(ITEM_LIST_PATH)
+    # item_pointers = []
+    # item_list_address = g2.follow_pointer_path(ITEM_LIST_PATH)
     
-    dataAddress = None
-    next = item_list_address
-    while next != 0:
-        memory = g2.read_memory(next, 0x0C)
-        _, dataAddress, next = struct.unpack("@iii", memory)
-        item_pointers.append(hex(dataAddress))
+    # dataAddress = None
+    # next = item_list_address
+    # while next != 0:
+    #     memory = g2.read_memory(next, 0x0C)
+    #     _, dataAddress, next = struct.unpack("@iii", memory)
+    #     item_pointers.append(hex(dataAddress))
     
-    print(item_pointers[:10])
-
-    # world = World(g2, world_address)
-    # resolver = Resolver(g2, world)
-    # i = 0
-    # while i < 5:
-    #     resolver.resolve_root()
-    #     i += 1
+    # print(item_pointers[:10])
+    world_address = g2.follow_pointer_path(WORLD_PATH)
+    world = World(g2, world_address)
+    resolver = Resolver(g2, world)
+    i = 0
+    while i < 5:
+        start = time.time_ns()
+        resolver.resolve_root()
+        i += 1
+        end = time.time_ns()
+        print((end - start) / (10**9))
 
 
    
