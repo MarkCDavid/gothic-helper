@@ -3,7 +3,7 @@ from PyQt5 import QtCore
 import numpy as np
 
 from pointer_paths import CAMERA_PATH
-from processingthread import Camera
+from processing.types import Camera
 
 class RepaintThread(QtCore.QThread):
     trigger = QtCore.pyqtSignal(object)
@@ -13,8 +13,8 @@ class RepaintThread(QtCore.QThread):
         self.process = process
 
     def run(self):
-        camera_pointer = self.process.follow_pointer_path(CAMERA_PATH)
-        camera = Camera(camera_pointer, self.process)
+        address = self.process.follow_pointer_path(CAMERA_PATH)
+        camera = Camera(self.process, address)
         while True:
             camera.load()
             viewProjectionMatrix = np.matmul(camera.projectionMatrix.npmatrix(), camera.viewMatrix.npmatrix())

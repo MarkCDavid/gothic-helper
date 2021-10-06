@@ -22,10 +22,10 @@ from PyQt5.QtCore import Qt
 from PyQt5.QtWidgets import QMainWindow, QApplication
 
 from process.process_constants import USER32
-from processingthread import ProcessingThread
-from repaintthread import RepaintThread
-
-
+from processing.npcthread import NpcThread
+# from processing.itemthread import ItemThread
+# from processing.mobthread import MobThread
+from processing.repaintthread import RepaintThread
 
 
 def find_window(parent, names):
@@ -40,23 +40,6 @@ def find_window(parent, names):
         result = find_window(child, names[1:])
         if result:
             return result
-
-def world_to_screen_space2(world_matrix, view_matrix, projection_matrix, width, height):
-    p = np.array([0, 0, 0, 1])
-    world_matrix = np.mat(world_matrix.as_list())
-    view_matrix = np.mat(view_matrix.as_list())
-    projection_matrix = np.mat(projection_matrix.as_list())
-
-    p = np.squeeze(np.asarray(np.dot(world_matrix, p)))
-    p = np.squeeze(np.asarray(np.dot(view_matrix, p)))
-    p = np.squeeze(np.asarray(np.dot(projection_matrix, p)))
-    x, y, z, w = p[0], p[1], p[2], p[3]
-
-    xp, yp = x / z, y / z
-    
-    x = ((xp + 1) / 2) * width
-    y = ((1 - yp) / 2) * height
-    return (int(x), int(y), w < 0)
 
 
 def world_to_screen_space3(worldMatrix, viewProjectionMatrix, width, height):
@@ -78,33 +61,38 @@ class MainWindow(QMainWindow):
             QtCore.Qt.FramelessWindowHint
         )
         self.setGeometry(x, y, w, h)
-        self.data = []
+        self.data = {}
         self.repaint_thread = RepaintThread(g2)
         self.repaint_thread.trigger.connect(self.repaint)
         self.repaint_thread.start()
-        self.processing_thread = ProcessingThread(g2)
-        self.processing_thread.trigger.connect(self.after_processing)
-        self.processing_thread.start()
+        self.npc_thread = NpcThread(g2)
+        self.npc_thread.trigger.connect(self.after_processing)
+        self.npc_thread.start()
+        # self.item_thread = ItemThread(g2)
+        # self.item_thread.trigger.connect(self.after_processing)
+        # self.item_thread.start()
+        # self.mob_thread = MobThread(g2)
+        # self.mob_thread.trigger.connect(self.after_processing)
+        # self.mob_thread.start()
 
     def repaint(self, data):
         self.viewProjectionMatrix = data 
         self.update()
 
-    def after_processing(self, data):
-        self.data = data
+    def after_processing(self, key, value):
+        self.data[key] = value
 
     def paintEvent(self, event):
         painter = QPainter(self)
-        for item in self.data:
-            position, name = item 
-            x, y, visible = world_to_screen_space3(position.npmatrix(), self.viewProjectionMatrix, 800, 600)
-            if visible:
-                color = clrs[name[0]]
-                painter.setPen(QPen(color, 2, Qt.DashLine))
-                painter.drawEllipse(int(x), int(y), 2, 2)
-                painter.drawText(int(x) - 50,  int(y) - 20, 100, 20, 0, f"<{name[1:]}>")
-                
-    
+        for key in self.data:
+            for item in self.data[key]:
+                position, name = item 
+                x, y, visible = world_to_screen_space3(position.npmatrix(), self.viewProjectionMatrix, 800, 600)
+                if visible:
+                    color = clrs[name[0]]
+                    painter.setPen(QPen(color, 2, Qt.DashLine))
+                    painter.drawEllipse(int(x), int(y), 2, 2)
+                    painter.drawText(int(x) - 50,  int(y) - 20, 100, 20, 0, f"<{name[1:]}>")
 
    
 if __name__ == '__main__':
@@ -126,32 +114,9 @@ if __name__ == '__main__':
             if "Gothic II" in w[1]: 
                 window = w
                 break
-
     
         x, y, w, h = window[2]
         app = QApplication(sys.argv)
         mywindow = MainWindow(g2, x, y, w, h)
         mywindow.show()
         app.exec()
-
-        # item_pointers = []
-        # item_list_address = g2.follow_pointer_path(ITEM_LIST_PATH)
-            
-            # dataAddress = None
-            # next = item_list_address
-            # while next != 0:
-            #     memory = g2.read_memory(next, 0x0C)
-            #     _, dataAddress, next = struct.unpack("@iii", memory)
-            #     item_pointers.append(hex(dataAddress))
-            
-            # print(item_pointers[:10])
-            # world_address = g2.follow_pointer_path(WORLD_PATH)
-            # world = World(g2, world_address)
-            # resolver = Resolver(g2, world)
-            # i = 0
-            # while i < 5:
-            #     start = time.time_ns()
-            #     resolver.resolve_root()
-            #     i += 1
-            #     end = time.time_ns()
-            #     print((end - start) / (10**9))
