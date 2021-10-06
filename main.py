@@ -1,19 +1,10 @@
 from ctypes import windll
 from process.process import Process
-import multiprocessing
-import struct
-from g2.memory.objectsUtils import sortList_iterator, zstring_value
-from g2.memory.resolver import Resolver
-from g2.npc import Npc
-from g2.world import World
 
 import numpy as np
-import time
-import math
 import win32gui
 import sys
 
-import threading
 
 from PyQt5 import QtGui, QtCore, uic
 from PyQt5 import QtWidgets
@@ -22,10 +13,8 @@ from PyQt5.QtCore import Qt
 from PyQt5.QtWidgets import QMainWindow, QApplication
 
 from process.process_constants import USER32
-from processing.npcthread import NpcThread
-# from processing.itemthread import ItemThread
-# from processing.mobthread import MobThread
-from processing.repaintthread import RepaintThread
+from processing.threads import ProcessingThread, RepaintThread
+from processing.types import VOB_TYPE_ITEM, VOB_TYPE_MOB, VOB_TYPE_NPC
 
 
 def find_window(parent, names):
@@ -50,7 +39,7 @@ def world_to_screen_space3(worldMatrix, viewProjectionMatrix, width, height):
     y = ((1 - yp) / 2) * height
     return (int(x), int(y), w < 0)
 
-clrs = { "I": Qt.green, "N": Qt.red, "W": Qt.yellow}
+clrs = { VOB_TYPE_MOB: Qt.green, VOB_TYPE_ITEM: Qt.red, VOB_TYPE_NPC: Qt.yellow}
 
 class MainWindow(QMainWindow):
     def __init__(self, g2, x, y, w, h):
@@ -61,39 +50,31 @@ class MainWindow(QMainWindow):
             QtCore.Qt.FramelessWindowHint
         )
         self.setGeometry(x, y, w, h)
-        self.data = {}
+        self.vobs = []
         self.repaint_thread = RepaintThread(g2)
         self.repaint_thread.trigger.connect(self.repaint)
         self.repaint_thread.start()
-        self.npc_thread = NpcThread(g2)
-        self.npc_thread.trigger.connect(self.after_processing)
-        self.npc_thread.start()
-        # self.item_thread = ItemThread(g2)
-        # self.item_thread.trigger.connect(self.after_processing)
-        # self.item_thread.start()
-        # self.mob_thread = MobThread(g2)
-        # self.mob_thread.trigger.connect(self.after_processing)
-        # self.mob_thread.start()
+        self.processing_thread = ProcessingThread(g2)
+        self.processing_thread.trigger.connect(self.after_processing)
+        self.processing_thread.start()
 
     def repaint(self, data):
         self.viewProjectionMatrix = data 
         self.update()
 
-    def after_processing(self, key, value):
-        self.data[key] = value
+    def after_processing(self, vobs):
+        self.vobs = vobs
 
     def paintEvent(self, event):
         painter = QPainter(self)
-        for key in self.data:
-            for item in self.data[key]:
-                position, name = item 
-                x, y, visible = world_to_screen_space3(position.npmatrix(), self.viewProjectionMatrix, 800, 600)
-                if visible:
-                    color = clrs[name[0]]
-                    painter.setPen(QPen(color, 2, Qt.DashLine))
-                    painter.drawEllipse(int(x), int(y), 2, 2)
-                    painter.drawText(int(x) - 50,  int(y) - 20, 100, 20, 0, f"<{name[1:]}>")
-
+        for vobd in self.vobs:
+            position, name, type = vobd.vob.transform, vobd.vob.getName(), vobd.vob.vobType
+            x, y, visible = world_to_screen_space3(position.npmatrix(), self.viewProjectionMatrix, 800, 600)
+            if visible:
+                color = clrs[type]
+                painter.setPen(QPen(color, 2, Qt.DashLine))
+                painter.drawEllipse(int(x + 10), int(y + 35), 2, 2)
+                painter.drawText(int(x) - 50,  int(y) - 20, 100, 20, 0, f"<{name}>")
    
 if __name__ == '__main__':
     with Process("Gothic2.exe") as g2:
