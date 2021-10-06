@@ -15,6 +15,7 @@ from PyQt5.QtWidgets import QMainWindow, QApplication
 from process.process_constants import USER32
 from processing.threads import ProcessingThread, RepaintThread
 from processing.types import VOB_TYPE_ITEM, VOB_TYPE_MOB, VOB_TYPE_NPC
+from window import Window
 
 
 def find_window(parent, names):
@@ -50,6 +51,7 @@ class MainWindow(QMainWindow):
             QtCore.Qt.FramelessWindowHint
         )
         self.setGeometry(x, y, w, h)
+        self.x, self.y, self.w, self.h = x, y, w, h
         self.vobs = []
         self.repaint_thread = RepaintThread(g2)
         self.repaint_thread.trigger.connect(self.repaint)
@@ -69,34 +71,20 @@ class MainWindow(QMainWindow):
         painter = QPainter(self)
         for vobd in self.vobs:
             position, name, type = vobd.vob.transform, vobd.vob.getName(), vobd.vob.vobType
-            x, y, visible = world_to_screen_space3(position.npmatrix(), self.viewProjectionMatrix, 800, 600)
+            x, y, visible = world_to_screen_space3(position.npmatrix(), self.viewProjectionMatrix, self.w, self.h)
             if visible:
                 color = clrs[type]
                 painter.setPen(QPen(color, 2, Qt.DashLine))
-                painter.drawEllipse(int(x + 10), int(y + 35), 2, 2)
-                painter.drawText(int(x) - 50,  int(y) - 20, 100, 20, 0, f"<{name}>")
+                painter.drawEllipse(int(x), int(y), 2, 2)
+                painter.drawText(int(x) - 50,  int(y) - 20, 300, 20, 0, f"<{name}>")
    
 if __name__ == '__main__':
     with Process("Gothic2.exe") as g2:
-        def window_enumeration_handler(window_handle, top_windows):
-            rect = win32gui.GetWindowRect(window_handle)
-            x = rect[0]
-            y = rect[1]
-            w = rect[2] - x
-            h = rect[3] - y
-            top_windows.append((window_handle, win32gui.GetWindowText(window_handle), (x, y, w, h)))
-
-
-        top_windows = []
-        win32gui.EnumWindows(window_enumeration_handler, top_windows)
-        window = None
-        handle = None
-        for w in top_windows:
-            if "Gothic II" in w[1]: 
-                window = w
-                break
-    
-        x, y, w, h = window[2]
+        window = Window(g2)
+        window.findWindow()
+        x, y, w, h = window.windowInfo()
+        print(window.windowInfo())
+        
         app = QApplication(sys.argv)
         mywindow = MainWindow(g2, x, y, w, h)
         mywindow.show()
