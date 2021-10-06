@@ -4,11 +4,13 @@ from process.process_info import ProcessInfoFetcher
 from process.process_constants import KERNEL32, PROCESS_ALL_ACCESS
 import traceback as tb
 import struct
+from multiprocessing import Lock
 
 from process.sizes import SIZE_BYTE, SIZE_DOUBLE, SIZE_FLOAT, SIZE_INT32, SIZE_UINT32
 
 class Process:
     def __init__(self, processName) -> None:
+        self.lock = Lock()
         self.buffer = Buffer(Buffer.MB)
         self.processInfo = ProcessInfoFetcher().by_name(processName)  
         if self.processInfo.pid is None:
@@ -16,11 +18,14 @@ class Process:
         self._handle = None
 
     def read_memory(self, address, size):
-        bufferPointer, bufferSize = self.buffer.allocate(SIZE_BYTE * size)
-        success = KERNEL32.ReadProcessMemory(self._handle, address, bufferPointer, bufferSize, byref(c_size_t()))
-        if not success:
-            print(KERNEL32.GetLastError())
-        return self.buffer.read(0, size) if success else bytes()
+        with self.lock:
+            bufferPointer, bufferSize = self.buffer.allocate(SIZE_BYTE * size)
+            success = KERNEL32.ReadProcessMemory(self._handle, address, bufferPointer, bufferSize, byref(c_size_t()))
+            if not success:
+                print(hex(address))
+                print(f"READ MEMORY ERROR {KERNEL32.GetLastError()}")
+                exit()
+            return self.buffer.read(0, size) if success else bytes()
 
     def read_uint32(self, address):
         return self._read(address, "@I", SIZE_UINT32)
