@@ -1,3 +1,4 @@
+from dataclasses import field
 import struct
 import numpy as np
 from collections import namedtuple
@@ -12,7 +13,7 @@ VOB_TYPE_MOB = 128
 VOB_TYPE_ITEM = 129
 VOB_TYPE_NPC = 130
 
-FieldData = namedtuple("FieldData", ["offset", "size"])
+FieldData = namedtuple("FieldData", ["offset", "format", "size"])
 
 
 class Core:
@@ -24,24 +25,23 @@ class Core:
         pass
 
     def _read(self, fieldData):
-        return self.process.read_memory(self.address + fieldData.offset, fieldData.size)
+        return self.process.read_fd(self.address, fieldData)
 
     def _read_string(self, fieldData):
-        memory = self.process.read_memory(self.address + fieldData.offset, fieldData.size)
-        (address, length) = struct.unpack("@Ii", memory)
-        if address == 0:
-            return None
+        (address, length) = self._read(fieldData)
+        if address == 0 or length < 0 or length > 500:
+            return ""
         return self.process.read_memory(address, length).decode("ascii")
 
 
 class Object(Core):
-    FD_OBJECT_NAME = FieldData(0x0018, SIZE_ZSTRING)
+    FD_OBJECT_NAME = FieldData(0x0018, "@Ii", SIZE_ZSTRING)
 
     def __init__(self, process, address):
         super().__init__(process, address)
         self.objectName = None
 
-    def getName(self):
+    def getName(self) -> str:
         return self.objectName
 
     def load(self):
@@ -49,34 +49,37 @@ class Object(Core):
         self.objectName = self._read_string(Object.FD_OBJECT_NAME)
 
 
-
 class Vob(Object):
-    FD_TRANSFORM = FieldData(0x003C, SIZE_MAT4)
-    FD_VOB_TYPE = FieldData(0x00B0, SIZE_UINT32)
+    FD_TRANSFORM = FieldData(0x003C, "@ffffffffffffffff", SIZE_MAT4)
+    FD_VOB_TYPE = FieldData(0x00B0, "@I", SIZE_UINT32)
+    FD_HOME_WORLD = FieldData(0x00B8, "@I", SIZE_UINT32)
 
     def __init__(self, process, address):
         super().__init__(process, address)
         self.transform = None
         self.vobType = None
+        self.homeWorld = None
 
     def load(self):
         super().load()
         self.transform = Mat4(self._read(Vob.FD_TRANSFORM))
         self.vobType = self.getVobType(self.process, self.address)
+        self.homeWorld = self._read(Vob.FD_HOME_WORLD)
 
     @staticmethod
     def getVobType(process, address):
-        memory = process.read_memory(address + Vob.FD_VOB_TYPE.offset, Vob.FD_VOB_TYPE.size)
-        return struct.unpack("@I", memory)[0]
+        return process.read_fd(address, Vob.FD_VOB_TYPE)
 
 
 class Item(Vob):
-    FD_NAME = FieldData(0x012C, SIZE_ZSTRING)
-    FD_DESCRIPTION = FieldData(0x027C, SIZE_ZSTRING)
+    FD_NAME = FieldData(0x012C, "@Ii", SIZE_ZSTRING)
+    FD_OWNER = FieldData(0x0200, "@I", SIZE_UINT32)
+    FD_DESCRIPTION = FieldData(0x027C, "@Ii", SIZE_ZSTRING)
 
     def __init__(self, process, address):
         super().__init__(process, address)
         self.name = None
+        self.owner = None
         self.description = None
 
     def getName(self):
@@ -85,11 +88,12 @@ class Item(Vob):
     def load(self):
         super().load()
         self.name = self._read_string(Item.FD_NAME)
+        self.owner = self._read(Item.FD_OWNER)
         self.description = self._read_string(Item.FD_DESCRIPTION)
 
 
 class Npc(Vob):
-    FD_NAME = FieldData(0x012C, SIZE_ZSTRING)
+    FD_NAME = FieldData(0x012C, "@Ii", SIZE_ZSTRING)
 
     def __init__(self, process, address):
         super().__init__(process, address)
@@ -104,7 +108,7 @@ class Npc(Vob):
 
 
 class Mob(Vob):
-    FD_NAME = FieldData(0x0128, SIZE_ZSTRING)
+    FD_NAME = FieldData(0x0128, "@Ii", SIZE_ZSTRING)
 
     def __init__(self, process, address):
         super().__init__(process, address)
@@ -119,8 +123,8 @@ class Mob(Vob):
 
 
 class Camera(Core):
-    FD_VIEW_MATRIX = FieldData(0x0148, SIZE_MAT4)
-    FD_PROJECTION_MATRIX = FieldData(0x0814, SIZE_MAT4)
+    FD_VIEW_MATRIX = FieldData(0x0148, "@ffffffffffffffff", SIZE_MAT4)
+    FD_PROJECTION_MATRIX = FieldData(0x0814, "@ffffffffffffffff", SIZE_MAT4)
 
     def __init__(self, process, address):
         super().__init__(process, address)
@@ -151,7 +155,7 @@ class Mat4:
             self.m42,
             self.m43,
             self.m44,
-        ) = struct.unpack("@ffffffffffffffff", binary)
+        ) = binary
 
     def get_coordinates(self):
         return (self.m14, self.m24, self.m34, self.m44)

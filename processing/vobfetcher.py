@@ -1,7 +1,8 @@
 import struct
 
 from time import time
-from processing.types import VOB_TYPE_ITEM, VOB_TYPE_MOB, VOB_TYPE_NPC, Item, Mob, Npc, Vob
+from process.sizes import SIZE_UINT32
+from processing.types import VOB_TYPE_ITEM, VOB_TYPE_MOB, VOB_TYPE_NPC, FieldData, Item, Mob, Npc, Vob
 
 
 class VobFetcher:
@@ -54,11 +55,11 @@ class VobFetcher:
                     self.vobsDict[address] = vob
                     self.vobs.append(vob)
 
+    FD_LIST = FieldData(0x04, "@II", SIZE_UINT32 * 2)
     def _followList(self):
         next = self.address
         while next != 0:
-            memory_packed = self.process.read_memory(next + 0x04, 0x08)
-            address, next = struct.unpack("@II", memory_packed)
+            address, next = self.process.read_fd(next, self.FD_LIST)
             yield address
 
     def _createVob(self, address, type):

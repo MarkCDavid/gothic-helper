@@ -9,9 +9,9 @@ from processing.vobfetcher import ItemFetcher, MobFetcher, NpcFetcher, VobFetche
 from pointer_paths import ITEM_LIST_PATH, NPC_LIST_PATH, VOB_LIST_PATH, CAMERA_PATH
 
 @dataclass(order=True)
-class VobDistance:
+class VobMetaData:
     distance: int
-    vob: Any = field(compare=False)
+    vob: Vob = field(compare=False)
 
 
 class ProcessingThread(QtCore.QThread):
@@ -29,15 +29,15 @@ class ProcessingThread(QtCore.QThread):
 
         self.mobFetcher = MobFetcher(self.process, vobListAddress, 120, 3600)
         self.itemFetcher = ItemFetcher(self.process, itemListAddress, 30, 5)
-        self.npcFetcher = NpcFetcher(self.process, npcListAddress, 30, 0.1)
+        self.npcFetcher = NpcFetcher(self.process, npcListAddress, 30, 0.033)
 
     def run(self):
         hero = self.npcFetcher.fetchHero()
 
         while True:
             vobs = []
-            vobs.extend(self._getClosestVobs(self.npcFetcher, hero, 10))
-            vobs.extend(self._getClosestVobs(self.itemFetcher, hero, 10))
+            vobs.extend(self._getClosestVobs(self.npcFetcher, hero, 20))
+            vobs.extend(self._getClosestVobs(self.itemFetcher, hero, 30))
             vobs.extend(self._getClosestVobs(self.mobFetcher, hero, 10))
             self.trigger.emit(vobs)
 
@@ -46,7 +46,7 @@ class ProcessingThread(QtCore.QThread):
 
         vobsHeap = []
         for vob in vobFetcher.getVobs():
-            if vob.address != hero.address:
+            if self._should_add(vob, hero):
                 heapq.heappush(vobsHeap, self._getVobDistance(vob, hero))
 
         vobs = []
@@ -55,12 +55,24 @@ class ProcessingThread(QtCore.QThread):
             vobs.append(heapq.heappop(vobsHeap))
         return vobs
 
+    def _should_add(self, vob: Vob, hero: Npc):
+        if vob.homeWorld == 0:
+            return False
+            
+        if vob.address == hero.address:
+            return False
+
+        if isinstance(vob, Item) and vob.owner != 0:
+            return False
+
+        return True
+
     def _getVobDistance(self, vob: Vob, hero: Npc):
         hx, hy, hz, _ = hero.transform.get_coordinates()
         ix, iy, iz, _ = vob.transform.get_coordinates()
         if abs(ix) < self.EPSILON and abs(iy) < self.EPSILON and abs(iz) < self.EPSILON:
-            return VobDistance(math.inf, vob)
-        return VobDistance(self._sqDistance(hx, hy, hz, ix, iy, iz), vob)
+            return VobMetaData(math.inf, vob)
+        return VobMetaData(self._sqDistance(hx, hy, hz, ix, iy, iz), vob)
 
     def _sqDistance(self, x1, y1, z1, x2, y2, z2):
         x = x1 - x2

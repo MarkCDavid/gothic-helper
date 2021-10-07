@@ -1,4 +1,6 @@
+from collections import defaultdict, namedtuple
 from ctypes import windll
+from typing import List
 from process.process import Process
 
 import numpy as np
@@ -13,50 +15,24 @@ from PyQt5.QtCore import Qt
 from PyQt5.QtWidgets import QMainWindow, QApplication
 
 from process.process_constants import USER32
-from processing.threads import ProcessingThread, RepaintThread
+from processing.threads import ProcessingThread, RepaintThread, VobMetaData
 from processing.types import VOB_TYPE_ITEM, VOB_TYPE_MOB, VOB_TYPE_NPC
-from window import Window
+import widget
+from window import Window, WindowInfo
 
-
-def find_window(parent, names):
-    if not names:
-        return parent
-    name = names[0]
-    child = 0
-    while True:
-        child = USER32.FindWindowExW(parent, child, name, 0)
-        if not child:
-            return 0
-        result = find_window(child, names[1:])
-        if result:
-            return result
-
-
-def world_to_screen_space3(worldMatrix, viewProjectionMatrix, width, height):
-    screenSpaceMatrix = np.matmul(viewProjectionMatrix, worldMatrix)
-    x, y, z, w = screenSpaceMatrix[0, 3], screenSpaceMatrix[1, 3], screenSpaceMatrix[2, 3], screenSpaceMatrix[3, 3]
-    xp, yp = x / z, y / z
-    x = ((xp + 1) / 2) * width
-    y = ((1 - yp) / 2) * height
-    return (int(x), int(y), w < 0)
-
-clrs = { VOB_TYPE_MOB: Qt.green, VOB_TYPE_ITEM: Qt.red, VOB_TYPE_NPC: Qt.yellow}
-
-class MainWindow(QMainWindow):
-    def __init__(self, g2, x, y, w, h):
+class OverlayWindow(QMainWindow):
+    def __init__(self, process: Process, windowInfo: WindowInfo):
         QMainWindow.__init__(self)
         self.setAttribute(QtCore.Qt.WA_TranslucentBackground)
-        self.setWindowFlags(
-            QtCore.Qt.WindowStaysOnTopHint |
-            QtCore.Qt.FramelessWindowHint
-        )
-        self.setGeometry(x, y, w, h)
-        self.x, self.y, self.w, self.h = x, y, w, h
-        self.vobs = []
-        self.repaint_thread = RepaintThread(g2)
+        self.setWindowFlags(QtCore.Qt.WindowStaysOnTopHint | QtCore.Qt.FramelessWindowHint)
+        self.setGeometry(windowInfo.x, windowInfo.y, windowInfo.width, windowInfo.height)
+        self.windowInfo: WindowInfo = windowInfo
+        self.vobs : List[VobMetaData] = []
+        self.vobWidgets = widget.WidgetCollection({ VOB_TYPE_MOB: widget.MobWidget(), VOB_TYPE_ITEM: widget.ItemWidget(), VOB_TYPE_NPC: widget.NpcWidget() })
+        self.repaint_thread = RepaintThread(process)
         self.repaint_thread.trigger.connect(self.repaint)
         self.repaint_thread.start()
-        self.processing_thread = ProcessingThread(g2)
+        self.processing_thread = ProcessingThread(process)
         self.processing_thread.trigger.connect(self.after_processing)
         self.processing_thread.start()
 
@@ -64,28 +40,32 @@ class MainWindow(QMainWindow):
         self.viewProjectionMatrix = data 
         self.update()
 
-    def after_processing(self, vobs):
+    def after_processing(self, vobs: List[VobMetaData]):
         self.vobs = vobs
 
     def paintEvent(self, event):
         painter = QPainter(self)
-        for vobd in self.vobs:
-            position, name, type = vobd.vob.transform, vobd.vob.getName(), vobd.vob.vobType
-            x, y, visible = world_to_screen_space3(position.npmatrix(), self.viewProjectionMatrix, self.w, self.h)
+        for vobMetaData in self.vobs:
+            x, y, visible = self._world_to_screen_space(vobMetaData.vob.transform.npmatrix())
+            widget = self.vobWidgets.get(vobMetaData.vob.vobType)
             if visible:
-                color = clrs[type]
-                painter.setPen(QPen(color, 2, Qt.DashLine))
-                painter.drawEllipse(int(x), int(y), 2, 2)
-                painter.drawText(int(x) - 50,  int(y) - 20, 300, 20, 0, f"<{name}>")
+                widget.paint(painter, x, y, vobMetaData)
+
+    def _world_to_screen_space(self, worldMatrix):
+        screenSpaceMatrix = np.matmul(self.viewProjectionMatrix, worldMatrix)
+        x, y, z, w = screenSpaceMatrix[0, 3], screenSpaceMatrix[1, 3], screenSpaceMatrix[2, 3], screenSpaceMatrix[3, 3]
+        xp, yp = x / z, y / z
+        x = ((xp + 1) / 2) * self.windowInfo.width
+        y = ((1 - yp) / 2) * self.windowInfo.height
+        return (int(x), int(y), w < 0)
+
    
 if __name__ == '__main__':
-    with Process("Gothic2.exe") as g2:
-        window = Window(g2)
+    with Process("Gothic2.exe") as process:
+        window = Window(process)
         window.findWindow()
-        x, y, w, h = window.windowInfo()
-        print(window.windowInfo())
-        
-        app = QApplication(sys.argv)
-        mywindow = MainWindow(g2, x, y, w, h)
-        mywindow.show()
-        app.exec()
+
+        overlayApplication = QApplication(sys.argv)
+        overlayWindow = OverlayWindow(process, window.windowInfo())
+        overlayWindow.show()
+        overlayApplication.exec()

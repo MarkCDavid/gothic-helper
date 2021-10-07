@@ -6,7 +6,7 @@ import traceback as tb
 import struct
 from multiprocessing import Lock
 
-from process.sizes import SIZE_BYTE, SIZE_DOUBLE, SIZE_FLOAT, SIZE_INT32, SIZE_UINT32
+from process.sizes import SIZE_BYTE, SIZE_UINT32
 
 class Process:
     def __init__(self, processName) -> None:
@@ -19,36 +19,27 @@ class Process:
 
     def read_memory(self, address, size):
         with self.lock:
+            readBytes = c_size_t()
             bufferPointer, bufferSize = self.buffer.allocate(SIZE_BYTE * size)
-            success = KERNEL32.ReadProcessMemory(self._handle, address, bufferPointer, bufferSize, byref(c_size_t()))
+            success = KERNEL32.ReadProcessMemory(self._handle, address, bufferPointer, bufferSize, byref(readBytes))
             if not success:
-                print(hex(address))
-                print(f"READ MEMORY ERROR {KERNEL32.GetLastError()}")
-                exit()
+                print(f"address: {hex(address)} size: {bufferSize} read: {readBytes.value}")
+                print(f"read_memory error: {KERNEL32.GetLastError()}")
             return self.buffer.read(0, size) if success else bytes()
 
-    def read_uint32(self, address):
-        return self._read(address, "@I", SIZE_UINT32)
-    
-    def read_int32(self, address):
-        return self._read(address, "@i", SIZE_INT32)
-
-    def read_float(self, address):
-        return self._read(address, "@f", SIZE_FLOAT)
-
-    def read_double(self, address):
-        return self._read(address, "@d", SIZE_DOUBLE)
-
-    def _read(self, address, format, size):
+    def read(self, address, format, size):
         value_packed = self.read_memory(address, size)
-        (value,) = struct.unpack(format, value_packed)
-        return value
+        return struct.unpack(format, value_packed)
+
+    def read_fd(self, address, fieldData):
+        result = self.read(address + fieldData.offset, fieldData.format, fieldData.size)
+        return result if len(result) > 1 else result[0]
 
     def follow_pointer_path(self, pointer_path):
         address = self.processInfo.baseAddress
         for offset in pointer_path:
             address += offset
-            address = self.read_uint32(address)
+            (address,) = self.read(address, "@I", SIZE_UINT32)
         return address
     
     def __enter__(self):
