@@ -1,11 +1,11 @@
 import math
 import heapq
 import numpy as np
-from typing import Any
 from PyQt5 import QtCore
 from dataclasses import dataclass, field
-from processing.types import Item, Mob, Npc, Vob, Camera
-from processing.vobfetcher import ItemFetcher, MobFetcher, NpcFetcher, VobFetcher
+from processing.predicate import build_default_ignore_predicate, build_item_ignore_predicate
+from processing.types import Npc, Vob, Camera
+from processing.vobfetcher import ItemFetcher, MobFetcher, NpcFetcher
 from pointer_paths import ITEM_LIST_PATH, NPC_LIST_PATH, VOB_LIST_PATH, CAMERA_PATH
 
 @dataclass(order=True)
@@ -31,41 +31,33 @@ class ProcessingThread(QtCore.QThread):
         self.itemFetcher = ItemFetcher(self.process, itemListAddress, 30, 5)
         self.npcFetcher = NpcFetcher(self.process, npcListAddress, 30, 0.033)
 
+        self.defaultIgnorePredicate = build_default_ignore_predicate()
+        self.itemIgnorePredicate = build_item_ignore_predicate(self.npcFetcher)
+
     def run(self):
         hero = self.npcFetcher.fetchHero()
 
         while True:
             vobs = []
-            vobs.extend(self._getClosestVobs(self.npcFetcher, hero, 20))
-            vobs.extend(self._getClosestVobs(self.itemFetcher, hero, 30))
-            vobs.extend(self._getClosestVobs(self.mobFetcher, hero, 10))
+            vobs.extend(self._getClosestVobs(self.npcFetcher, hero, 20, self.defaultIgnorePredicate))
+            vobs.extend(self._getClosestVobs(self.itemFetcher, hero, 30, self.itemIgnorePredicate))
+            vobs.extend(self._getClosestVobs(self.mobFetcher, hero, 10, self.defaultIgnorePredicate))
             self.trigger.emit(vobs)
 
-    def _getClosestVobs(self, vobFetcher, hero, count):
+    def _getClosestVobs(self, vobFetcher, hero, count, ignorePredicate):
         vobFetcher.load()
 
         vobsHeap = []
         for vob in vobFetcher.getVobs():
-            if self._should_add(vob, hero):
-                heapq.heappush(vobsHeap, self._getVobDistance(vob, hero))
+            if ignorePredicate(vob, hero):
+                continue
+            heapq.heappush(vobsHeap, self._getVobDistance(vob, hero))
 
         vobs = []
         while vobsHeap and count > 0:
             count -= 1
             vobs.append(heapq.heappop(vobsHeap))
         return vobs
-
-    def _should_add(self, vob: Vob, hero: Npc):
-        if vob.homeWorld == 0:
-            return False
-            
-        if vob.address == hero.address:
-            return False
-
-        if isinstance(vob, Item) and vob.owner != 0:
-            return False
-
-        return True
 
     def _getVobDistance(self, vob: Vob, hero: Npc):
         hx, hy, hz, _ = hero.transform.get_coordinates()

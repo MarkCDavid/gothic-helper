@@ -1,5 +1,3 @@
-from dataclasses import field
-import struct
 import numpy as np
 from collections import namedtuple
 from process.sizes import SIZE_UINT32, SIZE_ZSTRING, SIZE_MAT4
@@ -14,7 +12,6 @@ VOB_TYPE_ITEM = 129
 VOB_TYPE_NPC = 130
 
 FieldData = namedtuple("FieldData", ["offset", "format", "size"])
-
 
 class Core:
     def __init__(self, process, address):
@@ -73,13 +70,11 @@ class Vob(Object):
 
 class Item(Vob):
     FD_NAME = FieldData(0x012C, "@Ii", SIZE_ZSTRING)
-    FD_OWNER = FieldData(0x0200, "@I", SIZE_UINT32)
     FD_DESCRIPTION = FieldData(0x027C, "@Ii", SIZE_ZSTRING)
 
     def __init__(self, process, address):
         super().__init__(process, address)
         self.name = None
-        self.owner = None
         self.description = None
 
     def getName(self):
@@ -88,16 +83,17 @@ class Item(Vob):
     def load(self):
         super().load()
         self.name = self._read_string(Item.FD_NAME)
-        self.owner = self._read(Item.FD_OWNER)
         self.description = self._read_string(Item.FD_DESCRIPTION)
 
 
 class Npc(Vob):
     FD_NAME = FieldData(0x012C, "@Ii", SIZE_ZSTRING)
+    FD_INTERACT_ITEM = FieldData(0x0968, "@I", SIZE_UINT32)
 
     def __init__(self, process, address):
         super().__init__(process, address)
         self.name = None
+        self.interactItem = None
 
     def getName(self):
         return self.name
@@ -105,6 +101,7 @@ class Npc(Vob):
     def load(self):
         super().load()
         self.name = self._read_string(Npc.FD_NAME)
+        self.interactItem = self._read(Npc.FD_INTERACT_ITEM)
 
 
 class Mob(Vob):

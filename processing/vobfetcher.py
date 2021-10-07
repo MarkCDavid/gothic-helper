@@ -1,6 +1,5 @@
-import struct
-
 from time import time
+from typing import Set
 from process.sizes import SIZE_UINT32
 from processing.types import VOB_TYPE_ITEM, VOB_TYPE_MOB, VOB_TYPE_NPC, FieldData, Item, Mob, Npc, Vob
 
@@ -88,6 +87,14 @@ class NpcFetcher(VobFetcher):
     def __init__(self, process, address, traversalInterval, loadInterval) -> None:
         super().__init__(process, address, traversalInterval, loadInterval)
         self.hero = None
+        self.ignoreItems: Set = set()
+
+    def _load(self):
+        super()._load()
+        self.ignoreItems.clear()
+        for vob in self.getVobs():
+            if vob.interactItem != 0 and vob.interactItem not in self.ignoreItems:
+                self.ignoreItems.add(vob.interactItem)
 
     def _createVob(self, address, type):
         return Npc(self.process, address) if type == VOB_TYPE_NPC else None
